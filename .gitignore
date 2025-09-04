@@ -1,0 +1,5 @@
+echo progress_log.csv > .gitignore
+echo 1rm.json >> .gitignore
+echo performance_history.json >> .gitignore
+echo program_library.json >> .gitignore
+echo achievements.json >> .gitignore

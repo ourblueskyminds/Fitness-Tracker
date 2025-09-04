@@ -1,0 +1,2 @@
+echo streamlit==1.29.0 > requirements.txt
+echo pandas >> requirements.txt
