@@ -1159,80 +1159,196 @@ elif page == "Recovery Metrics":
             st.rerun()
 
 elif page == "Create Program":
+    EXERCISE_LIBRARY = {
+        "Strength": [
+            {"name": "SSB Back Squat", "description": "Safety squat bar for quads, glutes, hamstrings."},
+            {"name": "Deadlifts", "description": "Compound lift for posterior chain, grip strength."},
+            {"name": "Hack Squat", "description": "Machine-based squat for quad focus."},
+            {"name": "Leg Press", "description": "Quad and glute hypertrophy with controlled range."},
+            {"name": "Romanian Deadlifts", "description": "Hamstring and glute-focused deadlift variation."},
+            {"name": "Weighted Pull-Ups", "description": "Upper body pulling strength, BJJ grip."},
+            {"name": "Power Cleans", "description": "Explosive lift for power and athleticism."},
+            {"name": "Bulgarian Split Squats", "description": "Unilateral leg strength, stability."},
+            {"name": "Lying Leg Curls", "description": "Hamstring isolation for hypertrophy."},
+            {"name": "Calf Raises", "description": "Calf strength and endurance."},
+            {"name": "Glute-Ham Raises", "description": "Posterior chain strength, BJJ-specific."},
+            {"name": "Seated Calf Raises", "description": "Calf hypertrophy with seated variation."},
+            {"name": "Step-Ups", "description": "Unilateral leg strength, functional movement."}
+        ],
+        "Conditioning": [
+            {"name": "Sprints", "description": "High-intensity running for anaerobic capacity."},
+            {"name": "Sprint Drills", "description": "Short bursts to improve speed and agility."},
+            {"name": "Battle Ropes", "description": "Full-body conditioning, BJJ endurance."},
+            {"name": "Box Jumps", "description": "Plyometric exercise for explosive power."},
+            {"name": "Long Jumps", "description": "Plyometric movement for leg power."},
+            {"name": "Bounding", "description": "Exaggerated strides for power and coordination."},
+            {"name": "Sled Pushes", "description": "Full-body conditioning, strength endurance."},
+            {"name": "Walk/Run Intervals", "description": "Aerobic conditioning for 5k prep."}
+        ],
+        "BJJ Drill": [
+            {"name": "Hanging Leg Raises", "description": "Core strength for BJJ guard work."},
+            {"name": "Plank Variations", "description": "Core stability for grappling."},
+            {"name": "Russian Twists", "description": "Rotational core strength for BJJ sweeps."},
+            {"name": "Farmer’s Carry", "description": "Grip and core endurance for BJJ control."}
+        ]
+    }
+
+    def generate_periodized_program(base_week):
+        program = {"days": {}, "prescriptions": {}}
+        for day_name, day_data in base_week["days"].items():
+            program["days"][day_name] = day_data.copy()
+            program["prescriptions"][day_name] = {
+                "Base": base_week["prescriptions"][day_name]["Base"].copy(),
+                "Intensity": {},
+                "Peaking": {}
+            }
+            for ex in day_data["exercises"]:
+                base_prescription = base_week["prescriptions"][day_name]["Base"].get(ex, {})
+                if "duration" in base_prescription:
+                    intensity = base_prescription.copy()
+                    peaking = base_prescription.copy()
+                    intensity["duration"] = f"{int(base_prescription['duration'].split('-')[0]) + 10}-{int(base_prescription['duration'].split('-')[1]) + 10} min"
+                    peaking["duration"] = f"{int(base_prescription['duration'].split('-')[0]) + 20}-{int(base_prescription['duration'].split('-')[1]) + 20} min"
+                    intensity["rpe"] = f"{float(base_prescription['rpe'].split('-')[0]) + 1}-{float(base_prescription['rpe'].split('-')[1]) + 1}"
+                    peaking["rpe"] = f"{float(base_prescription['rpe'].split('-')[0]) + 1.5}-{float(base_prescription['rpe'].split('-')[1]) + 1.5}"
+                    intensity["rest"] = max(30, base_prescription["rest"] - 15)
+                    peaking["rest"] = max(30, base_prescription["rest"] - 15)
+                    program["prescriptions"][day_name]["Intensity"][ex] = intensity
+                    program["prescriptions"][day_name]["Peaking"][ex] = peaking
+                else:
+                    intensity = base_prescription.copy()
+                    peaking = base_prescription.copy()
+                    intensity["sets"] = f"{max(2, int(base_prescription['sets'].split('-')[0]) - 1)}-{max(3, int(base_prescription['sets'].split('-')[-1]) - 1)}"
+                    peaking["sets"] = f"{max(2, int(base_prescription['sets'].split('-')[0]) - 1)}-{max(2, int(base_prescription['sets'].split('-')[-1]) - 1)}"
+                    intensity_reps = base_prescription["reps"].split('-')
+                    peaking_reps = base_prescription["reps"].split('-')
+                    intensity["reps"] = f"{max(1, int(intensity_reps[0]) - round(int(intensity_reps[0]) * 0.25))}-{max(1, int(intensity_reps[-1]) - round(int(intensity_reps[-1]) * 0.25))}"
+                    peaking["reps"] = f"{max(1, int(peaking_reps[0]) - round(int(peaking_reps[0]) * 0.5))}-{max(1, int(peaking_reps[-1]) - round(int(peaking_reps[-1]) * 0.5))}"
+                    intensity["percent_1rm"] = (min(0.95, base_prescription["percent_1rm"][0] + 0.1), min(1.0, base_prescription["percent_1rm"][1] + 0.1))
+                    peaking["percent_1rm"] = (min(0.95, base_prescription["percent_1rm"][0] + 0.2), min(1.0, base_prescription["percent_1rm"][1] + 0.2))
+                    intensity["rpe"] = f"{float(base_prescription['rpe'].split('-')[0]) + 1}-{float(base_prescription['rpe'].split('-')[1]) + 1}"
+                    peaking["rpe"] = f"{float(base_prescription['rpe'].split('-')[0]) + 1.5}-{float(base_prescription['rpe'].split('-')[1]) + 1.5}"
+                    intensity["rest"] = base_prescription["rest"] + 30
+                    peaking["rest"] = base_prescription["rest"] + 60
+                    program["prescriptions"][day_name]["Intensity"][ex] = intensity
+                    program["prescriptions"][day_name]["Peaking"][ex] = peaking
+        return program
+
     with st.expander("Create or Import Program", expanded=True):
         st.subheader("Create New Program")
-        program_name = st.text_input("Program Name")
-        duration_weeks = st.number_input("Duration (weeks)", min_value=1, max_value=52, value=12)
-        program_description = st.text_area("Program Description", height=150)
-        
-        if 'num_days' not in st.session_state:
-            st.session_state.num_days = 1
-        num_days = st.number_input("Number of Workout Days per Week", min_value=1, max_value=7, value=st.session_state.num_days)
-        if num_days != st.session_state.num_days:
-            st.session_state.num_days = num_days
-            st.session_state.days = [{"name": f"Day {i+1}", "description": "", "exercises": [], "schedule": [], "prescriptions": {}} for i in range(num_days)]
-        
-        days = st.session_state.get('days', [{"name": f"Day {i+1}", "description": "", "exercises": [], "schedule": [], "prescriptions": {}} for i in range(num_days)])
-        for i in range(num_days):
-            st.markdown(f"### Day {i+1}")
-            with st.container():
-                days[i]["name"] = st.text_input(f"Day {i+1} Name", value=days[i]["name"], key=f"day_name_{i}")
-                days[i]["description"] = st.text_area(f"Day {i+1} Description", value=days[i]["description"], key=f"day_desc_{i}")
-                exercises_input = st.text_area(f"Exercises (one per line)", value="\n".join(days[i]["exercises"]), key=f"day_ex_{i}")
-                days[i]["exercises"] = [ex.strip() for ex in exercises_input.split("\n") if ex.strip()]
-                days[i]["schedule"] = st.multiselect(f"Schedule (days of week)", options=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], default=days[i]["schedule"], key=f"day_schedule_{i}")
-                
-                for ex in days[i]["exercises"]:
-                    with st.expander(f"Prescriptions for {ex}"):
-                        exercise_type = st.selectbox(f"Exercise Type ({ex})", ["Strength", "Running/Speed", "BJJ Drill"], key=f"type_{i}_{ex}")
-                        for phase in ["Base", "Intensity", "Peaking"]:
-                            st.write(f"{phase} Phase")
-                            sets = st.text_input(f"Sets ({ex}, {phase})", value="3-4", key=f"sets_{i}_{ex}_{phase}")
-                            if exercise_type == "Running/Speed":
-                                duration = st.text_input(f"Duration ({ex}, {phase})", value="30-40 min", key=f"duration_{i}_{ex}_{phase}")
-                                distance = st.text_input(f"Distance ({ex}, {phase})", value="3-5 km", key=f"distance_{i}_{ex}_{phase}")
-                                pace = st.text_input(f"Pace ({ex}, {phase})", value="6-7 min/km", key=f"pace_{i}_{ex}_{phase}")
-                                rpe = st.text_input(f"RPE ({ex}, {phase})", value="6-7", key=f"rpe_{i}_{ex}_{phase}")
-                                rest = st.number_input(f"Rest (seconds, {ex}, {phase})", min_value=0, value=60, key=f"rest_{i}_{ex}_{phase}")
-                                days[i].setdefault("prescriptions", {}).setdefault(phase, {})[ex] = {
-                                    "duration": duration, "distance": distance, "pace": pace, "rpe": rpe, "rest": rest
-                                }
-                            else:
-                                reps = st.text_input(f"Reps or Duration ({ex}, {phase})", value="8-12" if exercise_type == "Strength" else "30-45 sec", key=f"reps_{i}_{ex}_{phase}")
-                                percent_1rm = st.text_input(f"%1RM ({ex}, {phase})", value="0.65-0.75" if exercise_type == "Strength" else "0-0", key=f"percent_1rm_{i}_{ex}_{phase}")
-                                rpe = st.text_input(f"RPE ({ex}, {phase})", value="7-8", key=f"rpe_{i}_{ex}_{phase}")
-                                rest = st.number_input(f"Rest (seconds, {ex}, {phase})", min_value=0, value=120 if exercise_type == "Strength" else 60, key=f"rest_{i}_{ex}_{phase}")
-                                try:
-                                    low, high = map(float, percent_1rm.split('-'))
-                                    if low < 0 or high > 1.0:
-                                        st.error(f"Invalid %1RM for {ex} in {phase}: must be between 0 and 1.0.")
-                                        continue
-                                    days[i].setdefault("prescriptions", {}).setdefault(phase, {})[ex] = {
-                                        "sets": sets, "reps": reps, "percent_1rm": (low, high), "rpe": rpe, "rest": rest
+        with st.form(key="create_program_form"):
+            st.markdown("### Step 1: Program Details")
+            program_name = st.text_input("Program Name", key="program_name")
+            duration_weeks = st.number_input("Duration (weeks)", min_value=1, max_value=52, value=12, key="duration_weeks")
+            program_description = st.text_area("Program Description", height=150, key="program_description")
+            
+            st.markdown("### Step 2: Weekly Structure")
+            if 'num_days' not in st.session_state:
+                st.session_state.num_days = 0
+                st.session_state.days = []
+            num_days = st.number_input("Number of Days per Week", min_value=0, max_value=7, value=st.session_state.num_days, key="num_days")
+            if num_days != st.session_state.num_days:
+                st.session_state.num_days = num_days
+                st.session_state.days = st.session_state.days[:num_days] + [{"type": "Workout", "name": f"Day {i+1}", "description": "", "exercises": [], "schedule": [], "prescriptions": {"Base": {}}} for i in range(len(st.session_state.days), num_days)]
+            
+            days = st.session_state.days
+            for i in range(st.session_state.num_days):
+                st.markdown(f"#### Day {i+1}")
+                with st.container():
+                    days[i]["type"] = st.selectbox(f"Day Type", ["Workout", "Rest"], key=f"day_type_{i}")
+                    if days[i]["type"] == "Workout":
+                        days[i]["name"] = st.text_input(f"Day Name", value=days[i]["name"], key=f"day_name_{i}")
+                        days[i]["description"] = st.text_area(f"Day Description", value=days[i]["description"], key=f"day_desc_{i}")
+                        days[i]["schedule"] = st.multiselect(f"Schedule (days of week)", options=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], default=days[i]["schedule"], key=f"day_schedule_{i}")
+                        
+                        st.markdown(f"##### Exercises for {days[i]['name']}")
+                        exercise_category = st.selectbox(f"Select Exercise Category", ["Strength", "Conditioning", "BJJ Drill"], key=f"exercise_category_{i}")
+                        available_exercises = [ex["name"] for ex in EXERCISE_LIBRARY[exercise_category]]
+                        selected_exercises = st.multiselect(f"Select Exercises", available_exercises, default=days[i]["exercises"], key=f"exercises_{i}")
+                        days[i]["exercises"] = selected_exercises
+                        
+                        for ex in days[i]["exercises"]:
+                            st.markdown(f"###### Prescriptions for {ex}")
+                            with st.container():
+                                exercise_type = st.selectbox(f"Exercise Type ({ex})", ["Strength", "Running/Speed", "BJJ Drill"], key=f"type_{i}_{ex}")
+                                st.markdown("**Base Phase**")
+                                sets = st.text_input(f"Sets ({ex})", value="3-4", key=f"sets_{i}_{ex}_Base")
+                                if exercise_type == "Running/Speed":
+                                    duration = st.text_input(f"Duration ({ex})", value="30-40 min", key=f"duration_{i}_{ex}_Base")
+                                    distance = st.text_input(f"Distance ({ex})", value="3-5 km", key=f"distance_{i}_{ex}_Base")
+                                    pace = st.text_input(f"Pace ({ex})", value="6-7 min/km", key=f"pace_{i}_{ex}_Base")
+                                    rpe = st.text_input(f"RPE ({ex})", value="6-7", key=f"rpe_{i}_{ex}_Base")
+                                    rest = st.number_input(f"Rest (seconds, {ex})", min_value=0, value=60, key=f"rest_{i}_{ex}_Base")
+                                    days[i]["prescriptions"]["Base"][ex] = {
+                                        "duration": duration, "distance": distance, "pace": pace, "rpe": rpe, "rest": rest
                                     }
-                                except ValueError:
-                                    st.error(f"Invalid %1RM format for {ex} in {phase}. Use 'low-high' (e.g., 0.65-0.75).")
-        
-        if st.button("Save Program"):
-            if not program_name:
-                st.error("Program name is required.")
-            else:
-                program = {
-                    "name": program_name,
-                    "duration_weeks": duration_weeks,
-                    "description": program_description,
-                    "days": {day["name"]: {"description": day["description"], "exercises": day["exercises"], "schedule": [ ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].index(s) for s in day["schedule"] ]} for day in days},
-                    "prescriptions": {day["name"]: day.get("prescriptions", {}) for day in days}
-                }
-                valid, message = validate_program(program)
-                if valid:
-                    if save_program(program):
-                        st.success("Program saved successfully!")
-                        st.rerun()
+                                else:
+                                    reps = st.text_input(f"Reps or Duration ({ex})", value="8-12" if exercise_type == "Strength" else "30-45 sec", key=f"reps_{i}_{ex}_Base")
+                                    percent_1rm = st.text_input(f"%1RM ({ex})", value="0.65-0.75" if exercise_type == "Strength" else "0-0", key=f"percent_1rm_{i}_{ex}_Base")
+                                    rpe = st.text_input(f"RPE ({ex})", value="7-8", key=f"rpe_{i}_{ex}_Base")
+                                    rest = st.number_input(f"Rest (seconds, {ex})", min_value=0, value=120 if exercise_type == "Strength" else 60, key=f"rest_{i}_{ex}_Base")
+                                    try:
+                                        low, high = map(float, percent_1rm.split('-'))
+                                        if low < 0 or high > 1.0:
+                                            st.error(f"Invalid %1RM for {ex} in Base phase: must be between 0 and 1.0.")
+                                            continue
+                                        days[i]["prescriptions"]["Base"][ex] = {
+                                            "sets": sets, "reps": reps, "percent_1rm": (low, high), "rpe": rpe, "rest": rest
+                                        }
+                                    except ValueError:
+                                        st.error(f"Invalid %1RM format for {ex} in Base phase. Use 'low-high' (e.g., 0.65-0.75).")
                     else:
-                        st.error("Program name already exists. Please choose a unique name.")
+                        days[i]["name"] = f"Rest Day {i+1}"
+                        days[i]["description"] = st.text_area(f"Rest Day Description", value=days[i]["description"], key=f"rest_desc_{i}")
+                        days[i]["schedule"] = st.multiselect(f"Schedule (days of week)", options=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], default=days[i]["schedule"], key=f"rest_schedule_{i}")
+                        days[i]["exercises"] = []
+                        days[i]["prescriptions"] = {"Base": {}, "Intensity": {}, "Peaking": {}}
+            
+            st.markdown("### Step 3: Review & Save")
+            if st.session_state.num_days > 0:
+                st.write("**Weekly Structure Preview**")
+                for i, day in enumerate(days):
+                    st.markdown(f"- **{day['name']}** ({', '.join(day['schedule'])}): {day['description']}")
+                    if day["type"] == "Workout":
+                        st.markdown("  Exercises: " + (", ".join(day["exercises"]) if day["exercises"] else "None"))
+            
+            submit_button = st.form_submit_button("Save Base Week")
+            if submit_button:
+                if not program_name:
+                    st.error("Program name is required.")
                 else:
-                    st.error(f"Failed to save program: {message}")
+                    base_week = {
+                        "name": program_name,
+                        "duration_weeks": 1,
+                        "description": program_description,
+                        "days": {day["name"]: {"description": day["description"], "exercises": day["exercises"], "schedule": [ ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].index(s) for s in day["schedule"] ]} for day in days},
+                        "prescriptions": {day["name"]: {"Base": day["prescriptions"]["Base"]} for day in days}
+                    }
+                    valid, message = validate_program(base_week)
+                    if valid:
+                        st.session_state.base_week = base_week
+                        st.success("Base week saved! You can now generate a full program or save as is.")
+                    else:
+                        st.error(f"Failed to save base week: {message}")
+            
+            if 'base_week' in st.session_state and st.session_state.num_days > 0:
+                if st.form_submit_button("Generate Autoregulated Program"):
+                    program = st.session_state.base_week.copy()
+                    program["duration_weeks"] = duration_weeks
+                    periodized = generate_periodized_program(st.session_state.base_week)
+                    program["prescriptions"] = periodized["prescriptions"]
+                    valid, message = validate_program(program)
+                    if valid:
+                        if save_program(program):
+                            st.success("Full program generated and saved successfully!")
+                            st.session_state.num_days = 0
+                            st.session_state.days = []
+                            del st.session_state.base_week
+                            st.rerun()
+                        else:
+                            st.error("Program name already exists. Please choose a unique name.")
+                    else:
+                        st.error(f"Failed to generate program: {message}")
         
         st.subheader("Import Program")
         st.write("Upload JSON or CSV. JSON should match default program structure. CSV needs: day, day_description, exercise, schedule (comma-separated), Base_sets, Base_reps, Base_percent_1rm, Base_rpe, Base_rest, etc.")
