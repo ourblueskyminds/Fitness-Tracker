@@ -875,7 +875,7 @@ elif page == "Workout of the Day":
     with col1:
         if st.session_state.display_date > program_start:
             if st.button("Previous Day"):
-                st.session_state.display_date = timedelta(days=1)
+                st.session_state.display_date -= timedelta(days=1)
                 for day in selected_program["days"]:
                     for ex in selected_program["days"][day]["exercises"]:
                         if f"set_results_{day}_{ex}" in st.session_state:
@@ -1249,27 +1249,26 @@ elif page == "Create Program":
                 st.session_state.days = []
             
             num_days = st.number_input("Number of Days per Week", min_value=0, max_value=7, key="num_days")
-            if num_days != st.session_state.num_days:
-                st.session_state.num_days = num_days
-                st.session_state.days = st.session_state.days[:num_days] + [{"type": "Workout", "name": f"Day {i+1}", "description": "", "exercises": [], "schedule": [], "prescriptions": {"Base": {}}} for i in range(len(st.session_state.days), num_days)]
             
-            days = st.session_state.days
-            for i in range(st.session_state.num_days):
+            # Initialize temporary days for form inputs
+            temp_days = st.session_state.days[:num_days] + [{"type": "Workout", "name": f"Day {i+1}", "description": "", "exercises": [], "schedule": [], "prescriptions": {"Base": {}}} for i in range(len(st.session_state.days), num_days)]
+            
+            for i in range(num_days):
                 st.markdown(f"#### Day {i+1}")
                 with st.container():
-                    days[i]["type"] = st.selectbox(f"Day Type", ["Workout", "Rest"], key=f"day_type_{i}")
-                    if days[i]["type"] == "Workout":
-                        days[i]["name"] = st.text_input(f"Day Name", value=days[i]["name"], key=f"day_name_{i}")
-                        days[i]["description"] = st.text_area(f"Day Description", value=days[i]["description"], key=f"day_desc_{i}")
-                        days[i]["schedule"] = st.multiselect(f"Schedule (days of week)", options=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], default=days[i]["schedule"], key=f"day_schedule_{i}")
+                    temp_days[i]["type"] = st.selectbox(f"Day Type", ["Workout", "Rest"], key=f"day_type_{i}")
+                    if temp_days[i]["type"] == "Workout":
+                        temp_days[i]["name"] = st.text_input(f"Day Name", value=temp_days[i]["name"], key=f"day_name_{i}")
+                        temp_days[i]["description"] = st.text_area(f"Day Description", value=temp_days[i]["description"], key=f"day_desc_{i}")
+                        temp_days[i]["schedule"] = st.multiselect(f"Schedule (days of week)", options=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], default=temp_days[i]["schedule"], key=f"day_schedule_{i}")
                         
-                        st.markdown(f"##### Exercises for {days[i]['name']}")
+                        st.markdown(f"##### Exercises for {temp_days[i]['name']}")
                         exercise_category = st.selectbox(f"Select Exercise Category", ["Strength", "Conditioning", "BJJ Drill"], key=f"exercise_category_{i}")
                         available_exercises = [ex["name"] for ex in EXERCISE_LIBRARY[exercise_category]]
-                        selected_exercises = st.multiselect(f"Select Exercises", available_exercises, default=days[i]["exercises"], key=f"exercises_{i}")
-                        days[i]["exercises"] = selected_exercises
+                        selected_exercises = st.multiselect(f"Select Exercises", available_exercises, default=temp_days[i]["exercises"], key=f"exercises_{i}")
+                        temp_days[i]["exercises"] = selected_exercises
                         
-                        for ex in days[i]["exercises"]:
+                        for ex in temp_days[i]["exercises"]:
                             st.markdown(f"###### Prescriptions for {ex}")
                             with st.container():
                                 exercise_type = st.selectbox(f"Exercise Type ({ex})", ["Strength", "Running/Speed", "BJJ Drill"], key=f"type_{i}_{ex}")
@@ -1281,7 +1280,7 @@ elif page == "Create Program":
                                     pace = st.text_input(f"Pace ({ex})", value="6-7 min/km", key=f"pace_{i}_{ex}_Base")
                                     rpe = st.text_input(f"RPE ({ex})", value="6-7", key=f"rpe_{i}_{ex}_Base")
                                     rest = st.number_input(f"Rest (seconds, {ex})", min_value=0, value=60, key=f"rest_{i}_{ex}_Base")
-                                    days[i]["prescriptions"]["Base"][ex] = {
+                                    temp_days[i]["prescriptions"]["Base"][ex] = {
                                         "duration": duration, "distance": distance, "pace": pace, "rpe": rpe, "rest": rest
                                     }
                                 else:
@@ -1294,37 +1293,39 @@ elif page == "Create Program":
                                         if low < 0 or high > 1.0:
                                             st.error(f"Invalid %1RM for {ex} in Base phase: must be between 0 and 1.0.")
                                             continue
-                                        days[i]["prescriptions"]["Base"][ex] = {
+                                        temp_days[i]["prescriptions"]["Base"][ex] = {
                                             "sets": sets, "reps": reps, "percent_1rm": (low, high), "rpe": rpe, "rest": rest
                                         }
                                     except ValueError:
                                         st.error(f"Invalid %1RM format for {ex} in Base phase. Use 'low-high' (e.g., 0.65-0.75).")
                     else:
-                        days[i]["name"] = f"Rest Day {i+1}"
-                        days[i]["description"] = st.text_area(f"Rest Day Description", value=days[i]["description"], key=f"rest_desc_{i}")
-                        days[i]["schedule"] = st.multiselect(f"Schedule (days of week)", options=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], default=days[i]["schedule"], key=f"rest_schedule_{i}")
-                        days[i]["exercises"] = []
-                        days[i]["prescriptions"] = {"Base": {}, "Intensity": {}, "Peaking": {}}
+                        temp_days[i]["name"] = f"Rest Day {i+1}"
+                        temp_days[i]["description"] = st.text_area(f"Rest Day Description", value=temp_days[i]["description"], key=f"rest_desc_{i}")
+                        temp_days[i]["schedule"] = st.multiselect(f"Schedule (days of week)", options=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], default=temp_days[i]["schedule"], key=f"rest_schedule_{i}")
+                        temp_days[i]["exercises"] = []
+                        temp_days[i]["prescriptions"] = {"Base": {}, "Intensity": {}, "Peaking": {}}
             
             st.markdown("### Step 3: Review & Save")
-            if st.session_state.num_days > 0:
+            if num_days > 0:
                 st.write("**Weekly Structure Preview**")
-                for i, day in enumerate(days):
+                for i, day in enumerate(temp_days):
                     st.markdown(f"- **{day['name']}** ({', '.join(day['schedule'])}): {day['description']}")
                     if day["type"] == "Workout":
                         st.markdown("  Exercises: " + (", ".join(day["exercises"]) if day["exercises"] else "None"))
             
-            submit_button = st.form_submit_button("Save Base Week")
-            if submit_button:
+            if st.form_submit_button("Update Program"):
                 if not program_name:
                     st.error("Program name is required.")
                 else:
+                    # Update session state with form data
+                    st.session_state.num_days = num_days
+                    st.session_state.days = temp_days
                     base_week = {
                         "name": program_name,
                         "duration_weeks": 1,
                         "description": program_description,
-                        "days": {day["name"]: {"description": day["description"], "exercises": day["exercises"], "schedule": [ ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].index(s) for s in day["schedule"] ]} for day in days},
-                        "prescriptions": {day["name"]: {"Base": day["prescriptions"]["Base"]} for day in days}
+                        "days": {day["name"]: {"description": day["description"], "exercises": day["exercises"], "schedule": [ ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].index(s) for s in day["schedule"] ]} for day in temp_days},
+                        "prescriptions": {day["name"]: {"Base": day["prescriptions"]["Base"]} for day in temp_days}
                     }
                     valid, message = validate_program(base_week)
                     if valid:
@@ -1333,7 +1334,8 @@ elif page == "Create Program":
                     else:
                         st.error(f"Failed to save base week: {message}")
             
-            if 'base_week' in st.session_state and st.session_state.num_days > 0:
+        if 'base_week' in st.session_state and st.session_state.num_days > 0:
+            with st.form(key="generate_program_form"):
                 if st.form_submit_button("Generate Autoregulated Program"):
                     program = st.session_state.base_week.copy()
                     program["duration_weeks"] = duration_weeks
@@ -1345,7 +1347,8 @@ elif page == "Create Program":
                             st.success("Full program generated and saved successfully!")
                             st.session_state.num_days = 0
                             st.session_state.days = []
-                            del st.session_state.base_week
+                            if 'base_week' in st.session_state:
+                                del st.session_state.base_week
                             st.rerun()
                         else:
                             st.error("Program name already exists. Please choose a unique name.")
