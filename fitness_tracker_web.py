@@ -875,7 +875,7 @@ elif page == "Workout of the Day":
     with col1:
         if st.session_state.display_date > program_start:
             if st.button("Previous Day"):
-                st.session_state.display_date -= timedelta(days=1)
+                st.session_state.display_date = timedelta(days=1)
                 for day in selected_program["days"]:
                     for ex in selected_program["days"][day]["exercises"]:
                         if f"set_results_{day}_{ex}" in st.session_state:
@@ -1245,8 +1245,10 @@ elif page == "Create Program":
             st.markdown("### Step 2: Weekly Structure")
             if 'num_days' not in st.session_state:
                 st.session_state.num_days = 0
+            if 'days' not in st.session_state:
                 st.session_state.days = []
-            num_days = st.number_input("Number of Days per Week", min_value=0, max_value=7, value=st.session_state.num_days, key="num_days")
+            
+            num_days = st.number_input("Number of Days per Week", min_value=0, max_value=7, key="num_days")
             if num_days != st.session_state.num_days:
                 st.session_state.num_days = num_days
                 st.session_state.days = st.session_state.days[:num_days] + [{"type": "Workout", "name": f"Day {i+1}", "description": "", "exercises": [], "schedule": [], "prescriptions": {"Base": {}}} for i in range(len(st.session_state.days), num_days)]
