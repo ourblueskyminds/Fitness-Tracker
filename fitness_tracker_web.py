@@ -898,7 +898,8 @@ elif page == "Workout of the Day":
     if workout_day is None and (0 <= (st.session_state.display_date - program_start).days < selected_program["duration_weeks"] * 7):
         with st.expander("Rest Day", expanded=True):
             st.markdown(f"**{st.session_state.display_date.strftime('%B %d, %Y')}: Rest Day**")
-            with st.expander("Warm-Up Suggestions", expanded=True):
+            st.markdown("### Warm-Up Suggestions")
+            with st.container():
                 if st.button("Generate Warm-Ups"):
                     st.session_state.warm_ups = random.sample(WARM_UPS["Rest"], 3)
                 if 'warm_ups' in st.session_state and st.session_state.warm_ups:
@@ -1173,7 +1174,8 @@ elif page == "Create Program":
         
         days = st.session_state.get('days', [{"name": f"Day {i+1}", "description": "", "exercises": [], "schedule": [], "prescriptions": {}} for i in range(num_days)])
         for i in range(num_days):
-            with st.expander(f"Day {i+1}"):
+            st.markdown(f"### Day {i+1}")
+            with st.container():
                 days[i]["name"] = st.text_input(f"Day {i+1} Name", value=days[i]["name"], key=f"day_name_{i}")
                 days[i]["description"] = st.text_area(f"Day {i+1} Description", value=days[i]["description"], key=f"day_desc_{i}")
                 exercises_input = st.text_area(f"Exercises (one per line)", value="\n".join(days[i]["exercises"]), key=f"day_ex_{i}")
