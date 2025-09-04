@@ -918,114 +918,117 @@ elif page == "Workout of the Day":
                 for warm_up in st.session_state.warm_ups:
                     st.markdown(f"- **{warm_up['name']}**: {warm_up['description']}")
         
-        with st.expander(f"{st.session_state.display_date.strftime('%B %d, %Y')}: {workout_day}, Week {week} - {phase} Phase", expanded=True):
-            st.markdown(selected_program["days"][workout_day]["description"])
-            exercises = selected_program["days"][workout_day]["exercises"]
-            with st.expander("Exercise Details", expanded=True):
-                exercise = st.selectbox("Exercise", exercises, key=f"exercise_{workout_day}")
-                
-                if f"last_exercise_{workout_day}" in st.session_state and st.session_state[f"last_exercise_{workout_day}"] != exercise:
-                    if f"set_results_{workout_day}_{exercise}" in st.session_state:
-                        del st.session_state[f"set_results_{workout_day}_{exercise}"]
-                st.session_state[f"last_exercise_{workout_day}"] = exercise
-                
-                history = load_performance(exercise)
-                recent = [entry for entry in history if entry['date'] >= (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")][-4:]
-                score = sum(1 if entry['success'] else -1 for entry in recent)
-                progress_width = min(100, max(0, (score + 3) * 100 / 6))
-                emoji = "🔥" if score >= 3 else "⚠️" if score <= -3 else "💪"
-                st.markdown(f"Progress: {emoji} <div class='progress-bar'><div class='progress-fill' style='width: {progress_width}%'></div></div>", unsafe_allow_html=True)
-                
-                suggested_rest_time = selected_program["prescriptions"][workout_day][phase][exercise]["rest"]
-                st.text_input("Suggested Rest Time (seconds)", value=str(suggested_rest_time), disabled=True)
-                
-                if "running" in workout_day.lower() or "speed" in workout_day.lower() or "conditioning" in workout_day.lower():
-                    st.subheader("Interval Timer")
-                    default_ratios = {
-                        "Base": (120000, 60000),
-                        "Intensity": (180000, 60000),
-                        "Peaking": (240000, 60000)
-                    }
-                    run_time_ms, walk_time_ms = default_ratios.get(phase, (120000, 60000))
-                    run_time_key = f"run_time_{workout_day}_{exercise}"
-                    walk_time_key = f"walk_time_{workout_day}_{exercise}"
-                    if run_time_key not in st.session_state:
-                        st.session_state[run_time_key] = run_time_ms / 1000
-                    if walk_time_key not in st.session_state:
-                        st.session_state[walk_time_key] = walk_time_ms / 1000
-                    st.session_state[run_time_key] = st.number_input("Run Duration (seconds)", min_value=1.0, value=float(st.session_state[run_time_key]), step=1.0)
-                    st.session_state[walk_time_key] = st.number_input("Walk Duration (seconds)", min_value=1.0, value=float(st.session_state[walk_time_key]), step=1.0)
-                    render_interval_timer(int(st.session_state[run_time_key] * 1000), int(st.session_state[walk_time_key] * 1000))
-                    
-                    st.subheader("Conditioning Metrics")
-                    adjusted, _ = update_prescription(exercise, None, None, workout_day, phase, st.session_state.sensitivity, selected_program)
-                    prescribed = format_prescription(adjusted, exercise, onerms.get(exercise, 0))
-                    st.text_input("Prescribed", value=prescribed, disabled=True)
-                    target_duration = st.text_input("Target Duration (min)", value="30")
-                    target_distance = st.text_input("Target Distance (km)", value="5")
-                    target_pace = st.text_input("Target Pace (min/km)", value="5:00")
-                    details = st.text_input("Total Work", value=prescribed)
-                else:
-                    st.subheader("Stopwatch")
-                    render_stopwatch(suggested_rest_time * 1000)
-                    
-                    onerm = st.number_input("1RM (lbs, enter to update)", min_value=0.0, value=float(onerms.get(exercise, 0)), step=5.0)
-                    if onerm and onerm > 0:
-                        save_1rm(exercise, onerm)
-                        onerms[exercise] = onerm
-                    adjusted, _ = update_prescription(exercise, None, None, workout_day, phase, st.session_state.sensitivity, selected_program)
-                    prescribed = format_prescription(adjusted, exercise, onerms.get(exercise, 0))
-                    st.write(f"Suggested Weight: {suggest_weight(exercise, onerms.get(exercise, 0), phase, adjusted.get('percent_1rm', (0.65, 0.75)))}")
-                    st.text_input("Prescribed", value=prescribed, disabled=True)
-                    details = st.text_input("Total Work", value=prescribed)
+        st.markdown(f"**{st.session_state.display_date.strftime('%B %d, %Y')}: {workout_day}, Week {week} - {phase} Phase**")
+        st.markdown(selected_program["days"][workout_day]["description"])
+        exercises = selected_program["days"][workout_day]["exercises"]
+        
+        st.markdown("### Exercise Details")
+        with st.container():
+            exercise = st.selectbox("Exercise", exercises, key=f"exercise_{workout_day}")
             
-            with st.expander("Log Sets", expanded=True):
-                st.write("Mark 'Success' if completed with good form at target RPE; 'Fail' if not.")
-                num_sets = int(adjusted['sets'].split('-')[-1]) if '-' in adjusted.get('sets', '3') else int(adjusted.get('sets', '3'))
-                set_results_key = f"set_results_{workout_day}_{exercise}"
-                if set_results_key not in st.session_state or len(st.session_state[set_results_key]) != num_sets:
-                    st.session_state[set_results_key] = [None] * num_sets
-                set_results = st.session_state[set_results_key]
-                for i in range(num_sets):
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    with col1:
-                        st.write(f"Set {i+1}")
-                    with col2:
-                        if st.button("Success", key=f"success_{workout_day}_{exercise}_{i}"):
-                            set_results[i] = True
-                            adjusted, score = update_prescription(exercise, True, i+1, workout_day, phase, st.session_state.sensitivity, selected_program)
-                            st.session_state[set_results_key] = set_results
-                            if exercise in selected_program["prescriptions"][workout_day][phase]:
-                                components.html(f"<script>window.parent.postMessage({{'type': 'updateRestTime', 'newTime': {selected_program['prescriptions'][workout_day][phase][exercise]['rest'] * 1000}}}, '*')</script>", height=0)
-                            st.rerun()
-                    with col3:
-                        if st.button("Fail", key=f"fail_{workout_day}_{exercise}_{i}"):
-                            set_results[i] = False
-                            adjusted, score = update_prescription(exercise, False, i+1, workout_day, phase, st.session_state.sensitivity, selected_program)
-                            st.session_state[set_results_key] = set_results
-                            if exercise in selected_program["prescriptions"][workout_day][phase]:
-                                components.html(f"<script>window.parent.postMessage({{'type': 'updateRestTime', 'newTime': {selected_program['prescriptions'][workout_day][phase][exercise]['rest'] * 1000}}}, '*')</script>", height=0)
-                            st.rerun()
-                    if i < len(set_results) and set_results[i] is not None:
-                        st.write(f"Set {i+1}: {'Success' if set_results[i] else 'Fail'}")
+            if f"last_exercise_{workout_day}" in st.session_state and st.session_state[f"last_exercise_{workout_day}"] != exercise:
+                if f"set_results_{workout_day}_{exercise}" in st.session_state:
+                    del st.session_state[f"set_results_{workout_day}_{exercise}"]
+            st.session_state[f"last_exercise_{workout_day}"] = exercise
+            
+            history = load_performance(exercise)
+            recent = [entry for entry in history if entry['date'] >= (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")][-4:]
+            score = sum(1 if entry['success'] else -1 for entry in recent)
+            progress_width = min(100, max(0, (score + 3) * 100 / 6))
+            emoji = "🔥" if score >= 3 else "⚠️" if score <= -3 else "💪"
+            st.markdown(f"Progress: {emoji} <div class='progress-bar'><div class='progress-fill' style='width: {progress_width}%'></div></div>", unsafe_allow_html=True)
+            
+            suggested_rest_time = selected_program["prescriptions"][workout_day][phase][exercise]["rest"]
+            st.text_input("Suggested Rest Time (seconds)", value=str(suggested_rest_time), disabled=True)
+            
+            if "running" in workout_day.lower() or "speed" in workout_day.lower() or "conditioning" in workout_day.lower():
+                st.subheader("Interval Timer")
+                default_ratios = {
+                    "Base": (120000, 60000),
+                    "Intensity": (180000, 60000),
+                    "Peaking": (240000, 60000)
+                }
+                run_time_ms, walk_time_ms = default_ratios.get(phase, (120000, 60000))
+                run_time_key = f"run_time_{workout_day}_{exercise}"
+                walk_time_key = f"walk_time_{workout_day}_{exercise}"
+                if run_time_key not in st.session_state:
+                    st.session_state[run_time_key] = run_time_ms / 1000
+                if walk_time_key not in st.session_state:
+                    st.session_state[walk_time_key] = walk_time_ms / 1000
+                st.session_state[run_time_key] = st.number_input("Run Duration (seconds)", min_value=1.0, value=float(st.session_state[run_time_key]), step=1.0)
+                st.session_state[walk_time_key] = st.number_input("Walk Duration (seconds)", min_value=1.0, value=float(st.session_state[walk_time_key]), step=1.0)
+                render_interval_timer(int(st.session_state[run_time_key] * 1000), int(st.session_state[walk_time_key] * 1000))
                 
-                notes = st.text_area("Notes", height=150, value=f"{sum(1 for r in set_results if r is True)}/{num_sets} sets successful" if any(r is not None for r in set_results) else "")
-                if st.button("Finish Workout"):
-                    if not workout_day or not exercise:
-                        st.error("Please select an exercise.")
-                    else:
-                        data = {
-                            "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Type": "Workout",
-                            "Day": workout_day,
-                            "Exercise/Note": exercise,
-                            "Details": details,
-                            "Notes": notes + (f" 1RM: {onerms.get(exercise, 0)}" if onerms.get(exercise, 0) > 0 else "")
-                        }
-                        save_log("Workout", data)
-                        st.session_state[set_results_key] = [None] * num_sets
-                        st.success("Workout logged!")
+                st.subheader("Conditioning Metrics")
+                adjusted, _ = update_prescription(exercise, None, None, workout_day, phase, st.session_state.sensitivity, selected_program)
+                prescribed = format_prescription(adjusted, exercise, onerms.get(exercise, 0))
+                st.text_input("Prescribed", value=prescribed, disabled=True)
+                target_duration = st.text_input("Target Duration (min)", value="30")
+                target_distance = st.text_input("Target Distance (km)", value="5")
+                target_pace = st.text_input("Target Pace (min/km)", value="5:00")
+                details = st.text_input("Total Work", value=prescribed)
+            else:
+                st.subheader("Stopwatch")
+                render_stopwatch(suggested_rest_time * 1000)
+                
+                onerm = st.number_input("1RM (lbs, enter to update)", min_value=0.0, value=float(onerms.get(exercise, 0)), step=5.0)
+                if onerm and onerm > 0:
+                    save_1rm(exercise, onerm)
+                    onerms[exercise] = onerm
+                adjusted, _ = update_prescription(exercise, None, None, workout_day, phase, st.session_state.sensitivity, selected_program)
+                prescribed = format_prescription(adjusted, exercise, onerms.get(exercise, 0))
+                st.write(f"Suggested Weight: {suggest_weight(exercise, onerms.get(exercise, 0), phase, adjusted.get('percent_1rm', (0.65, 0.75)))}")
+                st.text_input("Prescribed", value=prescribed, disabled=True)
+                details = st.text_input("Total Work", value=prescribed)
+        
+        st.markdown("### Log Sets")
+        with st.container():
+            st.write("Mark 'Success' if completed with good form at target RPE; 'Fail' if not.")
+            num_sets = int(adjusted['sets'].split('-')[-1]) if '-' in adjusted.get('sets', '3') else int(adjusted.get('sets', '3'))
+            set_results_key = f"set_results_{workout_day}_{exercise}"
+            if set_results_key not in st.session_state or len(st.session_state[set_results_key]) != num_sets:
+                st.session_state[set_results_key] = [None] * num_sets
+            set_results = st.session_state[set_results_key]
+            for i in range(num_sets):
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.write(f"Set {i+1}")
+                with col2:
+                    if st.button("Success", key=f"success_{workout_day}_{exercise}_{i}"):
+                        set_results[i] = True
+                        adjusted, score = update_prescription(exercise, True, i+1, workout_day, phase, st.session_state.sensitivity, selected_program)
+                        st.session_state[set_results_key] = set_results
+                        if exercise in selected_program["prescriptions"][workout_day][phase]:
+                            components.html(f"<script>window.parent.postMessage({{'type': 'updateRestTime', 'newTime': {selected_program['prescriptions'][workout_day][phase][exercise]['rest'] * 1000}}}, '*')</script>", height=0)
                         st.rerun()
+                with col3:
+                    if st.button("Fail", key=f"fail_{workout_day}_{exercise}_{i}"):
+                        set_results[i] = False
+                        adjusted, score = update_prescription(exercise, False, i+1, workout_day, phase, st.session_state.sensitivity, selected_program)
+                        st.session_state[set_results_key] = set_results
+                        if exercise in selected_program["prescriptions"][workout_day][phase]:
+                            components.html(f"<script>window.parent.postMessage({{'type': 'updateRestTime', 'newTime': {selected_program['prescriptions'][workout_day][phase][exercise]['rest'] * 1000}}}, '*')</script>", height=0)
+                        st.rerun()
+                if i < len(set_results) and set_results[i] is not None:
+                    st.write(f"Set {i+1}: {'Success' if set_results[i] else 'Fail'}")
+            
+            notes = st.text_area("Notes", height=150, value=f"{sum(1 for r in set_results if r is True)}/{num_sets} sets successful" if any(r is not None for r in set_results) else "")
+            if st.button("Finish Workout"):
+                if not workout_day or not exercise:
+                    st.error("Please select an exercise.")
+                else:
+                    data = {
+                        "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Type": "Workout",
+                        "Day": workout_day,
+                        "Exercise/Note": exercise,
+                        "Details": details,
+                        "Notes": notes + (f" 1RM: {onerms.get(exercise, 0)}" if onerms.get(exercise, 0) > 0 else "")
+                    }
+                    save_log("Workout", data)
+                    st.session_state[set_results_key] = [None] * num_sets
+                    st.success("Workout logged!")
+                    st.rerun()
     else:
         with st.expander("Program Not Active", expanded=True):
             st.markdown(f"**{st.session_state.display_date.strftime('%B %d, %Y')}: Program not active**")
